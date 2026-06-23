@@ -5,7 +5,7 @@ from tkinter import messagebox,ttk
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "Cnsa0424.",
+    "password": "YOUR_PASSWORD",
     "database": "restaurant_db",
     "charset": "utf8mb4"
 }
@@ -346,10 +346,12 @@ class RestaurantGUI:
 
         tk.Button(self.root,text="返回首页",font=("宋体",12),command=self.show_main_menu).pack(pady=10)
 
+
 if __name__ == "__main__":
     root=tk.Tk()
     app=RestaurantGUI(root)
     root.mainloop()
+    
 
 
 
