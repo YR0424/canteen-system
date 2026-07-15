@@ -2,7 +2,7 @@ import pymysql
 import tkinter as tk
 from tkinter import messagebox,ttk
 from user_service import register_user,login_user
-from restaurant_service import (add_restaurant,get_all_restaurants,show_recommend,show_add_comment)
+from restaurant_service import (add_restaurant,get_all_restaurants,search_restaurant,show_recommend,show_add_comment,get_hot_restaurants)
 
 from database import get_conn,init_db
 init_db()
@@ -25,11 +25,13 @@ class RestaurantGUI:
         self.clear_win()
         tk.Label(self.root,text="智能餐厅推荐系统",font=("黑体",22)).pack(pady=35)
 
-        btn_cfg={"width":22,"height":2,"font":("宋体",12)}
+        btn_cfg={"width":22,"height":1,"font":("宋体",12)}
         tk.Button(self.root,text="用户注册",**btn_cfg,command=self.show_register).pack(pady=10)
         tk.Button(self.root, text="用户登录", **btn_cfg, command=self.show_login).pack(pady=10)
         tk.Button(self.root, text="添加餐厅", **btn_cfg, command=self.show_add_rest).pack(pady=10)
         tk.Button(self.root, text="查看所有餐厅", **btn_cfg, command=self.show_all_rest).pack(pady=10)
+        tk.Button(self.root,text="搜索餐厅",**btn_cfg,command=self.show_search_rest).pack(pady=10)
+        tk.Button(self.root, text="热门餐厅排行榜", **btn_cfg, command=self.show_hot_restaurants).pack(pady=10)
         tk.Button(self.root, text="退出系统", **btn_cfg, command=self.root.quit).pack(pady=10)
 
     #2.注册界面
@@ -137,11 +139,17 @@ class RestaurantGUI:
         tk.Label(self.root,text="智能餐厅推荐",font=("黑体",18)).pack(pady=15)
 
         #表格组件
-        cols=("餐厅名","菜系","人均价格","评分","地址")
+        cols=("餐厅名","菜系","人均价格","评分","地址","推荐分","推荐等级")
         tree=ttk.Treeview(self.root,columns=cols,show="headings",height=10)
         for c in cols:
             tree.heading(c,text=c)
-            tree.column(c,width=130)
+        tree.column("餐厅名",width=100)
+        tree.column("菜系",width=100)
+        tree.column("人均价格",width=80)
+        tree.column("评分",width=70)
+        tree.column("地址",width=130)
+        tree.column("推荐分",width=80)
+        tree.column("推荐等级",width=90)
         tree.pack(pady=10)
 
         res_list=show_recommend(self.current_user)
@@ -271,6 +279,65 @@ class RestaurantGUI:
 
         tk.Button(self.root,text="返回首页",font=("宋体",12),command=self.show_main_menu).pack(pady=10)
 
+    #9.搜索餐厅
+    def show_search_rest(self):
+        self.clear_win()
+        tk.Label(self.root,text="搜索餐厅",font=("黑体",18)).pack(pady=20)
+
+        frame=tk.Frame(self.root)
+        frame.pack()
+        tk.Label(frame, text="请输入餐厅名称：", font=("宋体", 12)).grid(row=0, column=0, padx=10, pady=10)
+        ent_keyword = tk.Entry(frame, width=30, font=("宋体", 12))
+        ent_keyword.grid(row=0, column=1)
+
+        cols=("餐厅名", "菜系", "人均价格", "评分", "地址")
+        tree=ttk.Treeview(self.root,columns=cols,show="headings",height=10)
+        for c in cols:
+            tree.heading(c,text=c)
+            tree.column(c,width=130)
+        tree.pack(pady=10)
+
+        def search():
+            keyword = ent_keyword.get().strip()
+            if not keyword:
+                messagebox.showwarning("提示", "请输入餐厅名称！")
+                return
+            data = search_restaurant(keyword)
+            for item in tree.get_children():
+                tree.delete(item)
+            if data:
+                for item in data:
+                    tree.insert('', 'end', values=item)
+            else:
+                messagebox.showinfo("提示", "未找到匹配的餐厅！")
+
+        tk.Button(self.root, text="搜索", font=("宋体", 12), command=search).pack(pady=10)
+        tk.Button(self.root, text="返回首页", font=("宋体", 12), command=self.show_main_menu).pack()
+    #10.热门餐厅排行榜
+    def show_hot_restaurants(self):
+        self.clear_win()
+        tk.Label(self.root, text="热门餐厅排行榜", font=("黑体", 18)).pack(pady=15)
+
+        cols = ("排名","餐厅名", "菜系", "人均价格", "平均评分", "评论数")
+        tree = ttk.Treeview(self.root, columns=cols, show="headings", height=10)
+        for c in cols:
+            tree.heading(c, text=c)
+        tree.column("排名", width=60)
+        tree.column("餐厅名", width=120)
+        tree.column("菜系", width=120)
+        tree.column("人均价格", width=90)
+        tree.column("平均评分", width=90)
+        tree.column("评论数", width=90)
+        tree.pack(pady=10)
+        data = get_hot_restaurants()
+        print(data)
+        rank = 1
+        for item in data:
+            tree.insert('', 'end', values=(rank, item[0], item[1], item[2], item[3], item[4]))
+            rank += 1
+
+        tk.Button(self.root, text="返回首页", font=("宋体", 12), command=self.show_main_menu).pack(pady=10)
+    
 
 if __name__ == "__main__":
     root=tk.Tk()
