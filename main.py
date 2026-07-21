@@ -2,7 +2,7 @@ import pymysql
 import tkinter as tk
 from tkinter import messagebox,ttk
 from user_service import register_user,login_user
-from restaurant_service import (add_restaurant,get_all_restaurants,search_restaurant,show_recommend,show_add_comment,get_hot_restaurants)
+from restaurant_service import (add_restaurant,get_all_restaurants,search_restaurant,show_recommend,show_add_comment,get_hot_restaurants,add_favorite,get_favorite )
 
 from database import get_conn,init_db
 init_db()
@@ -11,7 +11,7 @@ class RestaurantGUI:
     def __init__(self,root):
         self.root=root
         self.root.title("智能餐厅推荐系统")
-        self.root.geometry("720x520")
+        self.root.geometry("1300x600")
         self.root.resizable(False,False)
         self.current_user=None
         self.show_main_menu()
@@ -131,6 +131,8 @@ class RestaurantGUI:
         btn_cfg={"width":22,"height":2,"font":("宋体",12)}
         tk.Button(self.root,text="智能推荐餐厅",**btn_cfg,command=self.show_recommend).pack(pady=10)
         tk.Button(self.root, text="发表餐厅评价", **btn_cfg, command=self.show_add_comment).pack(pady=10)
+        tk.Button(self.root,text="查看餐厅评价",**btn_cfg,command=self.show_comments).pack(pady=10)
+        tk.Button(self.root, text="查看收藏餐厅", **btn_cfg, command=self.show_favorite).pack(pady=10)
         tk.Button(self.root, text="返回首页", **btn_cfg, command=self.show_main_menu).pack(pady=10)
 
     #5.智能推荐
@@ -139,17 +141,18 @@ class RestaurantGUI:
         tk.Label(self.root,text="智能餐厅推荐",font=("黑体",18)).pack(pady=15)
 
         #表格组件
-        cols=("餐厅名","菜系","人均价格","评分","地址","推荐分","推荐等级")
+        cols=("餐厅名","菜系","人均价格","评分","地址","推荐分","推荐等级","推荐理由")
         tree=ttk.Treeview(self.root,columns=cols,show="headings",height=10)
         for c in cols:
             tree.heading(c,text=c)
-        tree.column("餐厅名",width=100)
-        tree.column("菜系",width=100)
+        tree.column("餐厅名",width=120)
+        tree.column("菜系",width=120)
         tree.column("人均价格",width=80)
-        tree.column("评分",width=70)
-        tree.column("地址",width=130)
+        tree.column("评分",width=80)
+        tree.column("地址",width=100)
         tree.column("推荐分",width=80)
         tree.column("推荐等级",width=90)
+        tree.column("推荐理由",width=400)
         tree.pack(pady=10)
 
         res_list=show_recommend(self.current_user)
@@ -159,6 +162,19 @@ class RestaurantGUI:
         else:
             messagebox.showinfo("提示","暂无匹配的推荐餐厅！")
 
+        def favorite():
+            selected= tree.selection()
+            if not selected:
+                messagebox.showwarning("提示", "请先选择一个餐厅！")
+                return
+            item = tree.item(selected[0])
+            rname = item["values"][0]
+            success = add_favorite(self.current_user, rname)
+            if success:
+                messagebox.showinfo("成功", "收藏成功！")
+            else:
+                messagebox.showwarning("提示", "已经收藏过了！")
+        tk.Button(self.root, text="收藏当前餐厅", font=("宋体", 12), command=favorite).pack(pady=10)
         tk.Button(self.root,text="返回",font=("宋体",12),command=self.show_user_func).pack(pady=10)
 
     #6.发表评论
@@ -202,7 +218,40 @@ class RestaurantGUI:
         tk.Button(self.root,text="提交评论",font=("宋体",12),command=submit_comment).pack(pady=20)
         tk.Button(self.root,text="返回",font=("宋体",12),command=self.show_user_func).pack(pady=20)
 
-    #7.添加餐厅
+    #7.查看餐厅评价
+    def show_comments(self):
+        self.clear_win()
+        tk.Label(self.root, text="查看餐厅评价", font=("黑体", 18)).pack(pady=20)
+
+        frame = tk.Frame(self.root)
+        frame.pack()
+
+        tk.Label(frame, text="餐厅名称：", font=("宋体", 12)).grid(row=0, column=0, padx=10)
+        ent_rname = tk.Entry(frame, width=30)
+        ent_rname.grid(row=0, column=1)
+
+        cols = ("用户名", "评分", "评价内容")
+        tree = ttk.Treeview(self.root, columns=cols, show="headings", height=10)
+        for c in cols:
+            tree.heading(c, text=c)
+            tree.column(c, width=150)
+        tree.pack(pady=15)
+
+        def search_comments():
+            rname = ent_rname.get().strip()
+            if not rname:
+                messagebox.showwarning("提示", "请输入餐厅名称！")
+                return
+            data = get_comments(rname)
+            for item in tree.get_children():
+                tree.delete(item)
+            for item in data:
+                tree.insert('', 'end', values=item)
+
+        tk.Button(self.root, text="查询评价", command=search_comments).pack(pady=10)
+        tk.Button(self.root, text="返回", command=self.show_user_func).pack()
+
+    #8.添加餐厅
     def show_add_rest(self):
         self.clear_win()
         tk.Label(self.root,text="添加新餐厅",font=("黑体",18)).pack(pady=20)
@@ -260,7 +309,7 @@ class RestaurantGUI:
         tk.Button(self.root,text="添加餐厅",font=("宋体",12),command=add_rest).pack(pady=20)
         tk.Button(self.root, text="返回首页", font=("宋体", 12), command=self.show_main_menu).pack()
 
-    #8.查看全部餐厅
+    #9.查看全部餐厅
     def show_all_rest(self):
         self.clear_win()
         tk.Label(self.root,text="全部餐厅列表",font=("黑体",18)).pack(pady=15)
@@ -279,7 +328,7 @@ class RestaurantGUI:
 
         tk.Button(self.root,text="返回首页",font=("宋体",12),command=self.show_main_menu).pack(pady=10)
 
-    #9.搜索餐厅
+    #10.搜索餐厅
     def show_search_rest(self):
         self.clear_win()
         tk.Label(self.root,text="搜索餐厅",font=("黑体",18)).pack(pady=20)
@@ -313,7 +362,7 @@ class RestaurantGUI:
 
         tk.Button(self.root, text="搜索", font=("宋体", 12), command=search).pack(pady=10)
         tk.Button(self.root, text="返回首页", font=("宋体", 12), command=self.show_main_menu).pack()
-    #10.热门餐厅排行榜
+    #11.热门餐厅排行榜
     def show_hot_restaurants(self):
         self.clear_win()
         tk.Label(self.root, text="热门餐厅排行榜", font=("黑体", 18)).pack(pady=15)
@@ -337,7 +386,27 @@ class RestaurantGUI:
             rank += 1
 
         tk.Button(self.root, text="返回首页", font=("宋体", 12), command=self.show_main_menu).pack(pady=10)
-    
+    #12.查看收藏餐厅
+    def show_favorite(self):
+        self.clear_win()
+        tk.Label(self.root, text="我的收藏餐厅", font=("黑体", 18)).pack(pady=15)
+
+        cols = ("餐厅名", "菜系", "人均价格", "评分", "地址")
+        tree = ttk.Treeview(self.root, columns=cols, show="headings", height=10)
+        for c in cols:
+            tree.heading(c, text=c)
+            tree.column(c, width=120)
+        tree.pack(pady=10)
+
+        data = get_favorite(self.current_user)
+
+        if data:
+            for item in data:
+                tree.insert('', 'end', values=item)
+        else:
+            messagebox.showinfo("提示", "您还没有收藏的餐厅！")
+
+        tk.Button(self.root, text="返回", command=self.show_user_func).pack(pady=10)
 
 if __name__ == "__main__":
     root=tk.Tk()

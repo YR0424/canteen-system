@@ -120,9 +120,23 @@ def show_recommend(username):
             level = "推荐" 
         else:
             level = "一般"
-        recommend_list.append((rname, food_type, avg_price, score, address, round(total_score, 2), level))
+        #生成推荐理由
+        reasons = []
+        if taste_score == 40:
+            reasons.append("口味符合偏好")
+        if price_score == 20:
+            reasons.append("价格符合消费水平")
+        if score >= 4.5:
+            reasons.append("餐厅评分较高")
+        if comment_score >= 4.5:
+            reasons.append("评价不错")
+        reason_text = "、".join(reasons) 
+        recommend_list.append((rname, food_type, avg_price, score, address, round(total_score, 2), level, reason_text))
     #5.按推荐分排序
-    recommend_list.sort(key=lambda x: x[-2], reverse=True)
+    recommend_list.sort(key=lambda x: x[5], reverse=True)
+    print("排序后结果：")
+    for r in recommend_list:
+        print(r[0],r[5],r[6])
     conn.close()
     return recommend_list
 
@@ -133,12 +147,16 @@ def show_add_comment(username, rname, score, content):
 
     c.execute(
         """
-        SELECT * FROM restaurant WHERE rname=%s
+        SELECT * FROM restaurant WHERE TRIM(rname)=TRIM(%s)
         """,
         (rname,)
     )
 
-    if not c.fetchone():
+    restaurant = c.fetchone()
+
+    print("查询餐厅结果:", restaurant)
+
+    if not restaurant:
         conn.close()
         return False
 
@@ -151,9 +169,28 @@ def show_add_comment(username, rname, score, content):
         """,
         (username, rname, score, content)
     )
-
+    print("插入完成")
     conn.commit()
+    print("提交完成")
     conn.close()
+    return True
+#查看餐厅评价
+def show_comments(rname):
+    conn = get_conn()
+    c = conn.cursor()
+
+    c.execute(
+        """
+        SELECT username, score, content 
+        FROM comment 
+        WHERE rname=%s
+        """,
+        (rname,)
+    )
+
+    data = c.fetchall()
+    conn.close()
+    return data
 #热门餐厅排行榜
 def get_hot_restaurants():
     conn = get_conn()
@@ -178,4 +215,63 @@ def get_hot_restaurants():
 )
     data = c.fetchall()
     conn.close()
+    return data
+#收藏餐厅
+# 收藏餐厅
+def add_favorite(username, rname):
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        # 判断是否已经收藏
+        c.execute(
+            """
+            SELECT * FROM favorite
+            WHERE username=%s AND rname=%s
+            """,
+            (username, rname)
+        )
+
+        if c.fetchone():
+            return False
+        # 添加收藏
+        c.execute(
+            """
+            INSERT INTO favorite
+            (username,rname)
+            VALUES(%s,%s)
+            """,
+            (username,rname)
+        )
+
+        conn.commit()
+        return True
+
+    finally:
+        conn.close()
+
+# 查看我的收藏
+def get_favorite(username):
+
+    conn = get_conn()
+    c = conn.cursor()
+
+    c.execute(
+        """
+        SELECT 
+            restaurant.rname,
+            restaurant.food_type,
+            restaurant.avg_price,
+            restaurant.score,
+            restaurant.address
+        FROM favorite
+        JOIN restaurant
+        ON favorite.rname=restaurant.rname
+        WHERE favorite.username=%s
+        """,
+        (username,)
+    )
+
+    data=c.fetchall()
+    conn.close()
+
     return data
